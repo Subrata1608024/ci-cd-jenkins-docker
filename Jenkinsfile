@@ -4,27 +4,22 @@ pipeline {
   environment {
     COMPOSE_PROJECT_NAME = "demoapp"
     IMAGE_NAME          = "demoapp"
-    DOCKER_BUILDKIT     = "1"   // BuildKit for faster builds
-    // No DOCKER_HOST here; using local Docker socket on the agent
+    DOCKER_BUILDKIT     = "1"
   }
 
   options {
     timestamps()
-    ansiColor('xterm')
   }
 
   stages {
     stage('Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Unit Tests') {
       steps {
         sh '''
           set -euxo pipefail
-          # Run tests inside a disposable Python container (no local Python needed)
           docker run --rm -v "$PWD":/workspace -w /workspace python:3.11-slim bash -lc "
             pip install --no-cache-dir -r app/requirements.txt -r app/requirements-dev.txt &&
             pytest -q
@@ -47,7 +42,6 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          # Bring up (or update) the app locally on the agent using Docker Compose v2
           APP_VERSION=${BUILD_NUMBER} docker compose up -d --build --remove-orphans
           docker compose ps
         '''
@@ -72,9 +66,7 @@ pipeline {
       '''
       archiveArtifacts artifacts: 'compose.log', fingerprint: true
     }
-    success {
-      echo '✅ Build → Deploy → Health OK'
-    }
+    success { echo '✅ Build → Deploy → Health OK' }
     failure {
       echo '❌ Pipeline failed'
       sh 'docker compose ps || true'
