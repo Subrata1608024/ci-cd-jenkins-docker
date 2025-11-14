@@ -1,0 +1,56 @@
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /var/jenkins_home/workspace/demoapp
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Checkout)
+[Pipeline] checkout scm
+ > git rev-parse --resolve-git-dir /var/jenkins_home/workspace/demoapp/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://example.com/ci-cd-demo.git # timeout=10
+Checking out Revision abcdef1 (main)
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Unit Tests)
++ docker run --rm -v "$PWD":/workspace -w /workspace python:3.11-slim bash -lc "pip install -r app/requirements.txt -r app/requirements-dev.txt && pytest -q"
+collected 1 item
+app/tests/test_app.py .
+1 passed in 0.21s
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Package Image)
++ docker build -t demoapp:15 -t demoapp:latest .
+Successfully built 123456789abc
+Successfully tagged demoapp:15
+Successfully tagged demoapp:latest
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Deploy with Compose)
++ APP_VERSION=15 docker compose up -d --build --remove-orphans
+ ✔ app  Built
+ ✔ app  Started
+NAME                IMAGE              HEALTH    PORTS
+demoapp_app         demoapp:latest     starting  0.0.0.0:5000->5000/tcp
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Health Check)
++ ./healthcheck.sh http://localhost:5000/health app
+Waiting for service 'app' to be healthy at: http://localhost:5000/health
+Health not ready yet (attempt 1/30)...
+HTTP health endpoint is OK.
+Container health: healthy
+Health check passed.
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] archiveArtifacts
+Archiving artifacts
+[Pipeline] echo
+✅ Build → Deploy → Health OK
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS

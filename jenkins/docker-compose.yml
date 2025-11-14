@@ -1,0 +1,39 @@
+version: "3.9"
+services:
+  dind:
+    image: docker:27.1-dind
+    container_name: jenkins-dind
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=
+    ports:
+      - "2375:2375"
+    command: ["--host=tcp://0.0.0.0:2375", "--host=unix:///var/run/docker.sock"]
+    volumes:
+      - dind-storage:/var/lib/docker
+    networks:
+      - jenkins
+
+  jenkins:
+    build:
+      context: .
+    container_name: jenkins
+    environment:
+      - DOCKER_HOST=tcp://dind:2375
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    depends_on:
+      - dind
+    networks:
+      - jenkins
+
+volumes:
+  jenkins_home:
+  dind-storage:
+
+networks:
+  jenkins:
+    driver: bridge
