@@ -4,7 +4,7 @@ pipeline {
   environment {
     COMPOSE_PROJECT_NAME = "demoapp"
     IMAGE_NAME          = "demoapp"
-    DOCKER_BUILDKIT     = "1"
+    DOCKER_BUILDKIT     = "1"    // Faster Docker builds
   }
 
   options {
@@ -13,7 +13,9 @@ pipeline {
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
     stage('Unit Tests') {
@@ -21,10 +23,15 @@ pipeline {
         sh '''
 /bin/bash <<'BASH'
 set -euo pipefail
-docker run --rm -v "$PWD":/workspace -w /workspace python:3.11-slim bash -lc "
-  pip install --no-cache-dir -r app/requirements.txt -r app/requirements-dev.txt &&
-  pytest -q
-"
+# Run tests in a disposable Python container; no Python needed on the agent.
+docker run --rm \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  -e PYTHONPATH=/workspace \
+  python:3.11-slim bash -lc "
+    pip install --no-cache-dir -r app/requirements.txt -r app/requirements-dev.txt &&
+    pytest -q
+  "
 BASH
         '''
       }
@@ -47,6 +54,7 @@ BASH
         sh '''
 /bin/bash <<'BASH'
 set -euo pipefail
+# Bring up (or update) the app locally on the agent
 APP_VERSION="${BUILD_NUMBER}" docker compose up -d --build --remove-orphans
 docker compose ps
 BASH
@@ -59,6 +67,7 @@ BASH
         sh '''
 /bin/bash <<'BASH'
 set -euo pipefail
+# Verify HTTP endpoint and Docker health status
 ./healthcheck.sh http://localhost:5000/health app
 BASH
         '''
@@ -76,7 +85,9 @@ BASH
       '''
       archiveArtifacts artifacts: 'compose.log', fingerprint: true
     }
-    success { echo '✅ Build → Deploy → Health OK' }
+    success {
+      echo '✅ Build → Deploy → Health OK'
+    }
     failure {
       echo '❌ Pipeline failed'
       sh '''
