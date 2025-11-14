@@ -3,10 +3,9 @@ pipeline {
 
   environment {
     COMPOSE_PROJECT_NAME = "demoapp"
-    IMAGE_NAME = "demoapp"
-    DOCKER_BUILDKIT = "1"
-    // If running Jenkins with a DinD sidecar, uncomment the next line:
-    // DOCKER_HOST = "tcp://dind:2375"
+    IMAGE_NAME          = "demoapp"
+    DOCKER_BUILDKIT     = "1"   // BuildKit for faster builds
+    // No DOCKER_HOST here; using local Docker socket on the agent
   }
 
   options {
@@ -25,6 +24,7 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
+          # Run tests inside a disposable Python container (no local Python needed)
           docker run --rm -v "$PWD":/workspace -w /workspace python:3.11-slim bash -lc "
             pip install --no-cache-dir -r app/requirements.txt -r app/requirements-dev.txt &&
             pytest -q
@@ -47,6 +47,7 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
+          # Bring up (or update) the app locally on the agent using Docker Compose v2
           APP_VERSION=${BUILD_NUMBER} docker compose up -d --build --remove-orphans
           docker compose ps
         '''
@@ -80,3 +81,4 @@ pipeline {
     }
   }
 }
+ 
